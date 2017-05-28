@@ -3,21 +3,21 @@ package com.pukingminion.guessthesecond;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
+import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.Typeface;
 import android.media.MediaPlayer;
 import android.net.Uri;
-import android.net.wifi.p2p.WifiP2pManager;
 import android.os.AsyncTask;
+import android.os.Bundle;
 import android.os.Environment;
+import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
-import android.support.v7.widget.Toolbar;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
@@ -34,10 +34,11 @@ import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.Date;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener{
+public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     private static final int TARGET = 1000;
     private static final String THEME_MUSIC = "theme_music.mp3";
+    private static final int NUMBER_OF_CHANCES = 10;
     private long currentTimeInMs = 0;
     private long cumulativeOffset = 0;
     private long currentCount = 0;
@@ -54,6 +55,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private TextView startBtn;
     private TextView restartTv;
     private TextView shareBtn;
+    private TextView levels;
     private TextView gameTitle;
     private LinearLayout introLayout;
     private LinearLayout resultLayout;
@@ -81,6 +83,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         counterTv = (TextView) findViewById(R.id.counter_tv);
         introTv = (TextView) findViewById(R.id.intro_tv);
         instructions = (TextView) findViewById(R.id.instructions);
+        levels = (TextView) findViewById(R.id.levels);
         resultsTv = (TextView) findViewById(R.id.results_tv);
         perfectsTv = (TextView) findViewById(R.id.total_perfects);
         accuracyTv = (TextView) findViewById(R.id.accuracy);
@@ -94,6 +97,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (mAdView != null) {
             mAdView.loadAd(adRequest);
         }
+
+        SharedPreferences sp = getSharedPreferences("your_prefs", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sp.edit();
+        editor.putInt("level_val", 30);
+        editor.putInt("level_default",30);
+        editor.putBoolean("first_launch",true);
+        editor.apply();
+        DataHelper.setDifficultyLevel(1);
+
         setListeners();
         setTypefaces();
         resetGame();
@@ -105,6 +117,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         shareBtn.setOnClickListener(this);
         restartTv.setOnClickListener(this);
         instructions.setOnClickListener(this);
+        levels.setOnClickListener(this);
     }
 
     private void resetGame() {
@@ -122,7 +135,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         currentCount--;
         counterTv.setText(String.valueOf(currentCount));
         long offset = currentTimeInMs - previousTimeInMs - TARGET;
-        if (Math.abs(offset) <= 30) {
+        if (Math.abs(offset) <= DataHelper.getDifficulty()) {
             offsetTv.setText("Perfect!!!");
             noOfPerfects++;
         } else {
@@ -133,7 +146,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void resetScore() {
-        currentCount = 10;
+        currentCount = NUMBER_OF_CHANCES;
         cumulativeOffset = 0;
         previousTimeInMs = 0;
         noOfPerfects = 0;
@@ -145,6 +158,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         DecimalFormat df = new DecimalFormat();
         df.setMaximumFractionDigits(2);
         accuracy = (1 - (Math.abs(cumulativeOffset) / (TARGET * 10.0))) * 100;
+        accuracy =  Math.abs(accuracy - (NUMBER_OF_CHANCES - noOfPerfects) * 5);
         perfectsTv.setText("Perfects : " + String.valueOf(noOfPerfects));
         accuracyTv.setText("Accuracy : " + String.valueOf(df.format(accuracy) + "%"));
     }
@@ -188,7 +202,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         resultsTv.setTextSize(50);
         gameTitle.setTypeface(gameFont);
         instructions.setTypeface(custom_font);
+        levels.setTypeface(custom_font);
         offsetTv.setTextSize(50);
+    }
+
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        if(getFragmentManager().getBackStackEntryCount() > 1) {
+            getFragmentManager().popBackStack();
+        }
     }
 
     @Override
@@ -205,6 +228,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     showLayout(R.id.result_layout);
                     arenaView.setVisibility(View.GONE);
                 }
+                if (mMediaPlayer != null) {
+                    mMediaPlayer.stop();
+                    mMediaPlayer.release();
+                }
                 play("tick.mp3");
                 break;
             case R.id.start_button:
@@ -215,6 +242,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     mMediaPlayer.stop();
                     mMediaPlayer.release();
                 }
+                play("tick.mp3");
                 showLayout(R.id.counter_tv);
                 break;
             case R.id.share_btn:
@@ -223,16 +251,44 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 break;
             case R.id.restart_game:
                 resetGame();
+                if (mMediaPlayer != null) {
+                    mMediaPlayer.stop();
+                    mMediaPlayer.release();
+                }
+                play("tick.mp3");
+                break;
+            case R.id.levels:
+                LevelsFragment levelsFragment = new LevelsFragment();
+                levelsFragment.setOnLevelSelected(new ActionListener() {
+                    @Override
+                    public void onFinished(Object... args) {
+                        levels.setText("Level : " + args[0]);
+                    }
+                });
+                if (mMediaPlayer != null) {
+                    mMediaPlayer.stop();
+                    mMediaPlayer.release();
+                }
+                play("tick.mp3");
+                openFragment(levelsFragment);
                 break;
             case R.id.instructions:
-                InstructionsFragment nextFrag = new InstructionsFragment();
-                android.support.v4.app.FragmentManager fragmentManager = getSupportFragmentManager();
-                FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction().
-                        addToBackStack("blankfragment");
-                fragmentTransaction.add(android.R.id.content, nextFrag, "blankfragment").commit();
+                if (mMediaPlayer != null) {
+                    mMediaPlayer.stop();
+                    mMediaPlayer.release();
+                }
+                play("tick.mp3");
+                openFragment(new InstructionsFragment());
                 break;
 
         }
+    }
+
+    private void openFragment(Fragment fragment) {
+        android.support.v4.app.FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction().
+                addToBackStack("blankfragment");
+        fragmentTransaction.add(android.R.id.content, fragment, "blankfragment").commit();
     }
 
     private String takeScreenshot() {
@@ -251,7 +307,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public String store(Bitmap bm, String fileName) {
         File filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-        File dir = new File(filePath,fileName+".jpeg");
+        File dir = new File(filePath, fileName + ".jpeg");
         if (!dir.exists()) {
             dir.getParentFile().mkdirs();
         }
@@ -329,7 +385,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             shareIntent.setAction(Intent.ACTION_SEND);
             shareIntent.setType("image/jpeg");
             shareIntent.setPackage("com.whatsapp");
-            shareIntent.putExtra(Intent.EXTRA_TEXT, "Can you beat me here?");
+            shareIntent.putExtra(Intent.EXTRA_TEXT, "Can you beat me here? \n https://goo.gl/21Cuif");
             shareIntent.putExtra(Intent.EXTRA_STREAM, imageUri);
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 

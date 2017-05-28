@@ -40,5 +40,4 @@ public class InstructionsFragment extends Fragment {
         TextView instructionTv = (TextView) view.findViewById(R.id.instructions_det);
         instructionTv.setTypeface(custom_font);
     }
-
 }
