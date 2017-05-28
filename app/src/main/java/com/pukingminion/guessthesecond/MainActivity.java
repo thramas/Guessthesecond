@@ -84,6 +84,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         introTv = (TextView) findViewById(R.id.intro_tv);
         instructions = (TextView) findViewById(R.id.instructions);
         levels = (TextView) findViewById(R.id.levels);
+        levels.setText("Level : Child");
         resultsTv = (TextView) findViewById(R.id.results_tv);
         perfectsTv = (TextView) findViewById(R.id.total_perfects);
         accuracyTv = (TextView) findViewById(R.id.accuracy);
@@ -97,13 +98,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (mAdView != null) {
             mAdView.loadAd(adRequest);
         }
-
-        SharedPreferences sp = getSharedPreferences("your_prefs", Activity.MODE_PRIVATE);
-        SharedPreferences.Editor editor = sp.edit();
-        editor.putInt("level_val", 30);
-        editor.putInt("level_default",30);
-        editor.putBoolean("first_launch",true);
-        editor.apply();
         DataHelper.setDifficultyLevel(1);
 
         setListeners();
